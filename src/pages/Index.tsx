@@ -29,7 +29,7 @@ const Index = () => {
               
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-lg">
-                  <Link to="/dashboard" className="flex items-center gap-2">
+                  <Link to="/auth" className="flex items-center gap-2">
                     Começar agora
                     <ArrowRight className="w-4 h-4" />
                   </Link>
@@ -206,7 +206,7 @@ const Index = () => {
             </p>
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-lg">
-                <Link to="/dashboard" className="flex items-center gap-2">
+                <Link to="/auth" className="flex items-center gap-2">
                   Criar conta grátis
                   <ArrowRight className="w-4 h-4" />
                 </Link>
