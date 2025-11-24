@@ -1,57 +1,172 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MapPin, Navigation, Clock, Phone, Star, Search, Filter } from "lucide-react";
+import { MapPin, Navigation, Clock, Phone, Star, Search, Filter, Loader2, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { MapView } from "@/components/MapView";
+
+interface CollectionPoint {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  opening_hours: string;
+  active: boolean;
+}
 
 const Map = () => {
-  const collectionPoints = [
-    {
-      id: 1,
-      name: "Ponto Central EcoRecicla",
-      address: "Av. Principal, 1234 - Centro",
-      distance: "0.8 km",
-      hours: "Seg-Sex: 8h-18h | Sáb: 8h-12h",
-      phone: "(11) 1234-5678",
-      rating: 4.8,
-      materials: ["Plástico", "Papel", "Metal", "Vidro"],
-      status: "Aberto agora"
-    },
-    {
-      id: 2,
-      name: "Ponto Zona Norte",
-      address: "Rua das Flores, 567 - Zona Norte",
-      distance: "1.2 km",
-      hours: "Seg-Sex: 7h-19h",
-      phone: "(11) 8765-4321",
-      rating: 4.6,
-      materials: ["Plástico", "Papel", "Metal"],
-      status: "Aberto agora"
-    },
-    {
-      id: 3,
-      name: "EcoPonto Shopping",
-      address: "Shopping Verde, Piso 2 - Centro",
-      distance: "2.1 km",
-      hours: "Todos os dias: 10h-22h",
-      phone: "(11) 2468-1357",
-      rating: 4.9,
-      materials: ["Plástico", "Papel", "Eletrônicos"],
-      status: "Aberto agora"
-    },
-    {
-      id: 4,
-      name: "Ponto Bairro Sul",
-      address: "Praça da Sustentabilidade, 89",
-      distance: "3.5 km",
-      hours: "Seg-Sáb: 8h-17h",
-      phone: "(11) 9876-5432",
-      rating: 4.5,
-      materials: ["Todos os tipos"],
-      status: "Fecha às 17h"
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  const [filteredPoints, setFilteredPoints] = useState<CollectionPoint[]>([]);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
     }
-  ];
+  }, [user, authLoading, navigate]);
+
+  // Fetch collection points
+  useEffect(() => {
+    const fetchCollectionPoints = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("collection_points")
+          .select("*")
+          .eq("active", true)
+          .order("name");
+
+        if (error) throw error;
+
+        setCollectionPoints(data || []);
+        setFilteredPoints(data || []);
+      } catch (error: any) {
+        toast({
+          title: "Erro ao carregar pontos de coleta",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchCollectionPoints();
+    }
+  }, [user, toast]);
+
+  // Get user location
+  const getUserLocation = () => {
+    if ("geolocation" in navigator) {
+      setLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location: [number, number] = [
+            position.coords.latitude,
+            position.coords.longitude,
+          ];
+          setUserLocation(location);
+          setLoading(false);
+          toast({
+            title: "Localização obtida!",
+            description: "Mostrando pontos próximos a você",
+          });
+        },
+        (error) => {
+          setLoading(false);
+          toast({
+            title: "Erro ao obter localização",
+            description: "Não foi possível acessar sua localização. Verifique as permissões.",
+            variant: "destructive",
+          });
+        }
+      );
+    } else {
+      toast({
+        title: "Geolocalização não disponível",
+        description: "Seu navegador não suporta geolocalização",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calculate distance between two points
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radius of Earth in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    return distance;
+  };
+
+  // Get sorted points by distance
+  const getPointsWithDistance = () => {
+    if (!userLocation) return filteredPoints;
+
+    return filteredPoints
+      .map((point) => ({
+        ...point,
+        distance: calculateDistance(
+          userLocation[0],
+          userLocation[1],
+          point.latitude,
+          point.longitude
+        ),
+      }))
+      .sort((a, b) => a.distance - b.distance);
+  };
+
+  // Search filter
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredPoints(collectionPoints);
+    } else {
+      const filtered = collectionPoints.filter(
+        (point) =>
+          point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          point.address.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredPoints(filtered);
+    }
+  }, [searchTerm, collectionPoints]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Carregando pontos de coleta...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const pointsWithDistance = getPointsWithDistance();
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -65,7 +180,9 @@ const Map = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground">Pontos de Coleta</h1>
-                <p className="text-xs text-muted-foreground">Encontre o mais próximo</p>
+                <p className="text-xs text-muted-foreground">
+                  {collectionPoints.length} pontos disponíveis
+                </p>
               </div>
             </Link>
             
@@ -85,109 +202,106 @@ const Map = () => {
               <Input 
                 placeholder="Buscar por endereço ou nome do ponto..." 
                 className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Filtros
-            </Button>
-            <Button className="gradient-eco border-0 flex items-center gap-2">
-              <Navigation className="w-4 h-4" />
-              Usar localização
+            <Button
+              onClick={getUserLocation}
+              className="gradient-eco border-0 flex items-center gap-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Navigation className="w-4 h-4" />
+              )}
+              Usar minha localização
             </Button>
           </div>
         </Card>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Map Placeholder */}
-          <div className="order-2 lg:order-1">
-            <Card className="gradient-card border-0 shadow-eco h-[600px] relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/10 to-primary/10 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="w-20 h-20 rounded-full gradient-eco mx-auto flex items-center justify-center">
-                    <MapPin className="w-10 h-10 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Mapa Interativo</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Visualize todos os pontos de coleta próximos a você
-                    </p>
-                    <Badge variant="secondary">Em breve com Google Maps/Mapbox</Badge>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Mock map markers */}
-              <div className="absolute top-20 left-1/4 w-8 h-8 rounded-full gradient-eco flex items-center justify-center shadow-eco animate-bounce">
-                <MapPin className="w-4 h-4 text-white" />
-              </div>
-              <div className="absolute bottom-32 right-1/3 w-8 h-8 rounded-full gradient-eco flex items-center justify-center shadow-eco animate-bounce" style={{ animationDelay: '0.2s' }}>
-                <MapPin className="w-4 h-4 text-white" />
-              </div>
-              <div className="absolute top-1/2 right-1/4 w-8 h-8 rounded-full gradient-eco flex items-center justify-center shadow-eco animate-bounce" style={{ animationDelay: '0.4s' }}>
-                <MapPin className="w-4 h-4 text-white" />
-              </div>
-            </Card>
-          </div>
-
-          {/* Collection Points List */}
-          <div className="order-1 lg:order-2 space-y-4 max-h-[600px] overflow-y-auto">
-            {collectionPoints.map((point) => (
-              <Card key={point.id} className="gradient-card border-0 shadow-soft p-6 hover:shadow-eco transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">{point.name}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {point.address}
-                    </p>
-                  </div>
-                  <Badge className="bg-success/10 text-success">{point.distance}</Badge>
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">{point.hours}</span>
-                    <Badge variant="secondary" className="ml-auto">{point.status}</Badge>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">{point.phone}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-sm">
-                    <Star className="w-4 h-4 text-warning fill-warning" />
-                    <span className="font-medium">{point.rating}</span>
-                    <span className="text-muted-foreground">(124 avaliações)</span>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-xs text-muted-foreground mb-2">Materiais aceitos:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {point.materials.map((material, idx) => (
-                      <Badge key={idx} variant="outline" className="border-primary/30 text-primary">
-                        {material}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button className="flex-1 gradient-eco border-0" size="sm">
-                    <Navigation className="w-4 h-4 mr-2" />
-                    Ver rota
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    Ver detalhes
-                  </Button>
-                </div>
+        {filteredPoints.length === 0 ? (
+          <Card className="gradient-card border-0 shadow-soft p-12">
+            <div className="text-center space-y-4">
+              <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto" />
+              <h3 className="text-lg font-semibold">Nenhum ponto encontrado</h3>
+              <p className="text-muted-foreground">
+                Tente ajustar sua busca ou limpar os filtros
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Map */}
+            <div className="order-2 lg:order-1">
+              <Card className="gradient-card border-0 shadow-eco h-[600px] overflow-hidden p-0">
+                <MapView
+                  collectionPoints={filteredPoints}
+                  userLocation={userLocation}
+                  onPointSelect={setSelectedPoint}
+                />
               </Card>
-            ))}
+            </div>
+
+            {/* Collection Points List */}
+            <div className="order-1 lg:order-2 space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              {pointsWithDistance.map((point) => (
+                <Card 
+                  key={point.id} 
+                  className={`gradient-card border-0 shadow-soft p-6 hover:shadow-eco transition-all cursor-pointer ${
+                    selectedPoint?.id === point.id ? 'ring-2 ring-primary' : ''
+                  }`}
+                  onClick={() => setSelectedPoint(point)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold mb-1">{point.name}</h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        {point.address}
+                      </p>
+                    </div>
+                    {userLocation && 'distance' in point && typeof (point as any).distance === 'number' && (
+                      <Badge className="bg-success/10 text-success">
+                        {(point as any).distance < 1 
+                          ? `${((point as any).distance * 1000).toFixed(0)}m` 
+                          : `${(point as any).distance.toFixed(1)}km`}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{point.opening_hours}</span>
+                      <Badge variant="secondary" className="ml-auto bg-success/10 text-success">
+                        Aberto
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1 gradient-eco border-0" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(
+                          `https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`,
+                          "_blank"
+                        );
+                      }}
+                    >
+                      <Navigation className="w-4 h-4 mr-2" />
+                      Ver rota
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
