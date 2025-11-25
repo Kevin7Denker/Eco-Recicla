@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, MapPin, Award, TrendingUp, Gift, ChevronRight, Recycle, Calendar, LogOut } from "lucide-react";
+import { Leaf, MapPin, Award, TrendingUp, Gift, ChevronRight, Recycle, Calendar, LogOut, Package } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -97,13 +97,19 @@ const Dashboard = () => {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <Button className="gradient-eco border-0 shadow-lg">
-                <Link to="/dashboard/map" className="flex items-center gap-2">
+              <Button className="gradient-eco border-0 shadow-lg" asChild>
+                <Link to="/delivery" className="flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Registrar entrega
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/map" className="flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   Encontrar ponto
                 </Link>
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" asChild>
                 <Link to="/dashboard/coupons" className="flex items-center gap-2">
                   <Gift className="w-4 h-4" />
                   Ver cupons
