@@ -1,16 +1,41 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, MapPin, Award, TrendingUp, Gift, ChevronRight, Recycle, Calendar, LogOut, Package } from "lucide-react";
+import { Leaf, MapPin, Award, TrendingUp, Gift, ChevronRight, Recycle, Calendar, LogOut, Package, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      
+      setIsAdmin(!!data);
+    };
+
+    checkAdmin();
+  }, [user]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -59,9 +84,15 @@ const Dashboard = () => {
             
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/dashboard" className="text-sm font-medium text-primary">Início</Link>
-              <Link to="/dashboard/map" className="text-sm text-muted-foreground hover:text-primary transition-colors">Mapa</Link>
+              <Link to="/map" className="text-sm text-muted-foreground hover:text-primary transition-colors">Mapa</Link>
               <Link to="/dashboard/coupons" className="text-sm text-muted-foreground hover:text-primary transition-colors">Cupons</Link>
               <Link to="/dashboard/history" className="text-sm text-muted-foreground hover:text-primary transition-colors">Histórico</Link>
+              {isAdmin && (
+                <Link to="/admin" className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  Admin
+                </Link>
+              )}
             </nav>
             
             <div className="flex items-center gap-3">
