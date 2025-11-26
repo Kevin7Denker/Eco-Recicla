@@ -6,9 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import DashboardHistory from "./pages/DashboardHistory";
 import Map from "./pages/Map";
 import DeliveryRegistration from "./pages/DeliveryRegistration";
+import Coupons from "./pages/Coupons";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import MainLayout from "./components/MainLayout";
 import CollectionPointsManagement from "./pages/admin/CollectionPointsManagement";
 import PartnersManagement from "./pages/admin/PartnersManagement";
 import CouponsManagement from "./pages/admin/CouponsManagement";
@@ -24,18 +27,29 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          {/* Routes that should NOT show the main navbar */}
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/map" element={<Map />} />
-          <Route path="/delivery" element={<DeliveryRegistration />} />
+          <Route path="/" element={<Index />} />
+
+          {/* Routes wrapped by MainLayout (show navbar) */}
+          <Route element={<MainLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/history" element={<DashboardHistory />} />
+            <Route path="/map" element={<Map />} />
+            <Route path="/coupons" element={<Coupons />} />
+            <Route path="/delivery" element={<DeliveryRegistration />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+
+          {/* Admin-only routes (separate layout) */}
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/collection-points" element={<CollectionPointsManagement />} />
+          <Route
+            path="/admin/collection-points"
+            element={<CollectionPointsManagement />}
+          />
           <Route path="/admin/partners" element={<PartnersManagement />} />
           <Route path="/admin/coupons" element={<CouponsManagement />} />
           <Route path="/admin/users" element={<UsersManagement />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
