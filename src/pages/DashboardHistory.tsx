@@ -16,7 +16,7 @@ import { ptBR } from "date-fns/locale";
 import type { Database } from "@/integrations/supabase/types";
 
 type DeliveryRow = Database["public"]["Tables"]["deliveries"]["Row"] & {
-  collection_points?: { name: string }[] | null;
+  collection_points?: { name: string } | null;
 };
 
 const DashboardHistory: React.FC = () => {
@@ -105,9 +105,7 @@ const DashboardHistory: React.FC = () => {
                   <TableCell>{d.weight_kg.toFixed(2)}</TableCell>
                   <TableCell>{d.points_earned}</TableCell>
                   <TableCell>
-                    {d.collection_points && d.collection_points[0]
-                      ? d.collection_points[0].name
-                      : "-"}
+                    {d.collection_points?.name ?? "-"}
                   </TableCell>
                 </TableRow>
               ))
