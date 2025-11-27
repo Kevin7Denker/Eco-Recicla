@@ -370,8 +370,8 @@ const Dashboard = () => {
                       Validade: {expiry}
                     </p>
                   )}
-                  <Button size="sm" className="w-full gradient-eco border-0">
-                    Resgatar cupom
+                  <Button size="sm" className="w-full gradient-eco border-0" asChild>
+                    <Link to="/coupons">Ver no Marketplace</Link>
                   </Button>
                 </div>
               );
